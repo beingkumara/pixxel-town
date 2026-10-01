@@ -1,0 +1,99 @@
+/*
+ * Pixel Town — "a game world behind a chat bubble".
+ * Discord-led hybrid: cosmic indigo environment, one owned hue (Blurple) reserved
+ * for primary actions, semantic status colors. From MekaVerse: hairline 1px edges,
+ * mono micro-labels, the rendered world framed like a museum piece. No box-shadows —
+ * depth comes from surface contrast.
+ *
+ * Semantics: fuchsia = proximity whisper · cerulean = rooms & calls ·
+ * spring green = presence · ember = the town itself · blurple = primary action.
+ */
+:root {
+  /* Environment */
+  --color-page: #0e0f2d;
+  --color-page-deep: #080920;
+  --color-surface: #16183c;
+  --color-surface-2: #1e2150;
+  --color-chrome: #23272a;
+  --color-chrome-2: #2c2f33;
+
+  /* Text */
+  --color-text: #ffffff;
+  --color-fog: #babcd9;
+  --color-greyple: #99aab5;
+  --color-dim: #50555f;
+
+  /* Hairlines (MekaVerse Frost, dialed down for dark UI) */
+  --color-hairline: rgb(226 226 226 / 0.1);
+  --color-hairline-strong: rgb(226 226 226 / 0.22);
+
+  /* The owned hue */
+  --color-blurple: #5865f2;
+  --color-blurple-dark: #3442d9;
+  --color-blurple-hover: #8891f2;
+
+  /* Semantic */
+  --color-dm: #eb459e;
+  --color-room: #00b0f4;
+  --color-online: #57f287;
+  --color-ember: #fda220;
+  --color-danger: #de2761;
+
+  /* Section environments (each feature panel gets its own lighting) */
+  --env-dm: linear-gradient(135deg, #7a1e5a 0%, #3b1450 55%, #1e1a4a 100%);
+  --env-room: linear-gradient(135deg, #0a5d8f 0%, #16307a 55%, #1b1c52 100%);
+  --env-wander: linear-gradient(135deg, #3b2a7a 0%, #1f1f5c 60%, #16183c 100%);
+  --env-hero: radial-gradient(1200px 700px at 78% 20%, #2d2a8c 0%, transparent 60%),
+    radial-gradient(900px 600px at 0% 100%, #4a1a5e 0%, transparent 55%), var(--color-page);
+
+  /*
+   * Type: one grotesk superfamily split by width, like Ginto Nord / Ginto.
+   * Archivo Black at wdth 125 stands in for ABC Ginto Nord (wide, flat-cut terminals),
+   * Archivo at normal width for Ginto body, Geist Mono for GT America Mono chrome.
+   */
+  --font-display: 'Archivo', 'Arial Black', system-ui, sans-serif;
+  --font-body: 'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --stretch-display: 125%;
+  --stretch-body: 100%;
+  --weight-display: 900;
+
+  --text-micro: 0.6875rem; /* 11px mono chrome */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-h3: 1.5rem;
+  --text-h2: 2.25rem;
+  --text-display: clamp(2.25rem, 9.5vw, 4.25rem);
+
+  --leading-display: 0.86;
+  --leading-body: 1.45;
+  --tracking-body: 0.013em;
+  --tracking-display: -0.01em;
+  --tracking-mono: -0.02em;
+
+  /* Spacing: 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-20: 80px;
+
+  /* Radius: Discord's controls, MekaVerse's frame */
+  --radius-sm: 8px;
+  --radius-btn: 12px;
+  --radius-card: 16px;
+  --radius-panel: 24px;
+  --radius-frame: 20px;
+  --radius-pill: 104px;
+
+  --duration-fast: 140ms;
+  --duration-normal: 260ms;
+  --duration-slow: 600ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}

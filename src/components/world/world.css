@@ -1,0 +1,84 @@
+/* The world hangs like a framed piece: 20px frame radius, hairline edge, no shadow. */
+.world {
+  position: relative;
+  width: 100%;
+  max-width: calc((100dvh - 150px) * 960 / 576);
+  margin-inline: auto;
+  border-radius: var(--radius-frame);
+  border: 1px solid var(--color-hairline-strong);
+  overflow: hidden;
+  background: var(--color-page-deep);
+}
+
+/* A thin cerulean ring lights up while you're inside a room. */
+.world::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px transparent;
+  transition: box-shadow var(--duration-normal) ease;
+}
+
+.world--room::after {
+  box-shadow: inset 0 0 0 2px var(--color-room);
+}
+
+.world__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 576;
+  image-rendering: pixelated;
+}
+
+.dpad {
+  display: none;
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-12);
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 4px;
+  touch-action: none;
+  user-select: none;
+}
+
+.dpad button {
+  background: rgb(35 39 42 / 0.85);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.dpad button:active {
+  background: var(--color-blurple);
+}
+
+.dpad [data-dir='ArrowUp'] {
+  grid-area: 1 / 2;
+}
+.dpad [data-dir='ArrowLeft'] {
+  grid-area: 2 / 1;
+}
+.dpad [data-dir='ArrowRight'] {
+  grid-area: 2 / 3;
+}
+.dpad [data-dir='ArrowDown'] {
+  grid-area: 3 / 2;
+}
+
+/* Narrow screens: a squarer camera window that follows you (see lib/world/camera.ts). */
+@media (max-width: 639px) {
+  .world__canvas {
+    aspect-ratio: 1 / 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .dpad {
+    display: grid;
+  }
+}

@@ -1,0 +1,235 @@
+.town {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.town__main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+  gap: var(--space-6);
+  padding: var(--space-6) clamp(var(--space-4), 3vw, var(--space-8));
+  align-items: start;
+}
+
+.town__stage {
+  position: relative;
+  min-width: 0;
+}
+
+.town__keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  color: var(--color-greyple);
+}
+
+/* Keep each key with its label: wraps happen between groups, never inside one. */
+.town__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/* Arrow keycaps: one glyph each, set in the body face (the mono's arrows are hairlines). */
+.town__arrows {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.town__keys .town__arrows kbd {
+  min-width: 22px;
+  padding-inline: 4px;
+  text-align: center;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.town__keys kbd {
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  background: var(--color-chrome);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 6px;
+}
+
+.town__side {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.town__toast {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: rgb(222 39 97 / 0.14);
+  border: 1px solid rgb(222 39 97 / 0.55);
+  border-radius: var(--radius-card);
+  font-size: var(--text-sm);
+}
+
+.town__toast button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--color-fog);
+}
+
+.town__unread {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  list-style: none;
+  background: rgb(235 69 158 / 0.12);
+  border: 1px solid rgb(235 69 158 / 0.55);
+  border-radius: var(--radius-card);
+  font-size: var(--text-sm);
+  animation: chat-in var(--duration-normal) var(--ease-out-expo);
+}
+
+.town__unread strong {
+  color: var(--color-dm);
+  font-weight: 700;
+}
+
+.wander {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+}
+
+.wander__hero {
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  background: var(--env-wander);
+}
+
+.wander__title {
+  margin: 0;
+  font-size: var(--text-h2);
+}
+
+/* Beats the global .display leading (loaded after this file): stacked lines need 0.86–1.0. */
+.display.wander__title {
+  line-height: 0.95;
+}
+
+.wander__title span {
+  color: var(--color-ember);
+}
+
+.wander__tips {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--color-fog);
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.tip {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  vertical-align: 1px;
+}
+
+.tip--dm {
+  background: var(--color-dm);
+}
+.tip--room {
+  background: var(--color-room);
+  color: #04202b;
+}
+.tip--emote {
+  background: var(--color-ember);
+  color: #2a1500;
+}
+
+.wander__people {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+
+.wander__subtitle {
+  margin: 0 0 var(--space-3);
+  color: var(--color-greyple);
+  font-weight: 400;
+}
+
+.wander__empty {
+  margin: 0;
+  color: var(--color-greyple);
+  font-size: var(--text-sm);
+}
+
+.wander__roster {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wander__roster li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-3) 2px 2px;
+  background: var(--color-chrome);
+  border-radius: var(--radius-btn);
+}
+
+.wander__name {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+}
+
+.wander__name::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-online);
+}
+
+.wander__where {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-greyple);
+}
+
+@media (max-width: 1040px) {
+  .town__main {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .town__side {
+    position: static;
+  }
+}

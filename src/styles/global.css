@@ -1,0 +1,162 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--env-hero);
+  background-attachment: fixed;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-stretch: var(--stretch-body);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Faint star dust — atmosphere without competing with the world. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.55;
+  background:
+    radial-gradient(1px 1px at 12% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 12%, #fda220 50%, transparent 51%),
+    radial-gradient(1px 1px at 64% 38%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 30% 70%, #00b0f4 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 76%, #eb459e 50%, transparent 51%),
+    radial-gradient(1px 1px at 8% 88%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 48% 8%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 44%, #fff 50%, transparent 51%);
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-blurple-hover);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Display type: dense all-caps blocks (Discord). */
+.display {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+  font-stretch: var(--stretch-display);
+  font-variation-settings: 'wdth' 125;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+}
+
+/* Chrome labels: small mono (MekaVerse). */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-mono);
+  text-transform: uppercase;
+}
+
+/* Buttons — never below 12px radius; blurple only for the primary action. */
+.btn {
+  --btn-bg: var(--color-blurple);
+  --btn-bg-hover: var(--color-blurple-dark);
+  --btn-fg: var(--color-text);
+  --btn-border: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 12px 20px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: var(--text-base);
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out-expo),
+    border-color var(--duration-fast) ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn--lg {
+  padding: 19px 28px;
+  border-radius: var(--radius-card);
+  font-size: var(--text-lg);
+}
+
+.btn--sm {
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+}
+
+.btn--white {
+  --btn-bg: #fff;
+  --btn-bg-hover: #e8e9ff;
+  --btn-fg: var(--color-chrome);
+}
+
+.btn--ghost {
+  --btn-bg: transparent;
+  --btn-bg-hover: rgb(255 255 255 / 0.08);
+  --btn-border: var(--color-hairline-strong);
+}
+
+.btn--danger {
+  --btn-bg: var(--color-danger);
+  --btn-bg-hover: #b81e4f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

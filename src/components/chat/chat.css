@@ -1,0 +1,179 @@
+/* Feature panels: each conversation type is its own lit environment (Discord), no shadows. */
+.chat {
+  --accent: var(--color-dm);
+  --env: var(--env-dm);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  animation: chat-in var(--duration-normal) var(--ease-out-expo);
+}
+
+.chat--room {
+  --accent: var(--color-room);
+  --env: var(--env-room);
+}
+
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+.chat__header {
+  position: relative;
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  background: var(--env);
+  overflow: hidden;
+}
+
+/* A soft orb of the accent color, like a light source in the scene. */
+.chat__header::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -60px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 55%, transparent) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.chat__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: #fff;
+  opacity: 0.85;
+}
+
+.chat__eyebrow::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.chat__title {
+  position: relative;
+  margin: 0;
+  font-size: var(--text-h2);
+}
+
+/* Beats the global .display leading (loaded after this file): the top of the 0.86–1.0 range, so accents (É) clear the line above. */
+.display.chat__title {
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.chat__subtitle {
+  position: relative;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-fog);
+}
+
+.chat__list {
+  flex: 1;
+  min-height: 96px;
+  max-height: 32dvh;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  scrollbar-color: var(--color-dim) transparent;
+}
+
+.chat__empty {
+  color: var(--color-greyple);
+  font-size: var(--text-sm);
+}
+
+.chat__msg {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  max-width: 86%;
+  padding: 8px 14px 10px;
+  background: var(--color-chrome-2);
+  border-radius: var(--radius-card) var(--radius-card) var(--radius-card) 4px;
+  animation: msg-in var(--duration-normal) var(--ease-out-expo);
+}
+
+.chat__msg--mine {
+  align-self: flex-end;
+  background: var(--color-blurple);
+  border-radius: var(--radius-card) var(--radius-card) 4px var(--radius-card);
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.chat__meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-mono);
+  color: var(--color-fog);
+  opacity: 0.85;
+}
+
+.chat__msg--mine .chat__meta {
+  color: #e3e6ff;
+}
+
+.chat__text {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.chat__typing {
+  min-height: 1.4em;
+  margin: 0;
+  padding: 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--accent);
+}
+
+.chat__composer {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.chat__composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--color-chrome);
+  border: 1px solid var(--color-dim);
+  border-radius: var(--radius-btn);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.chat__composer input::placeholder {
+  color: var(--color-greyple);
+}
+
+.chat__composer input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.chat__composer input:disabled {
+  opacity: 0.6;
+}
