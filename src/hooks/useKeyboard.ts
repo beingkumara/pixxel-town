@@ -39,13 +39,15 @@ export function readInput(held: ReadonlySet<string>): MoveInput {
  * Tracks movement keys, ignoring keystrokes aimed at chat inputs.
  * Digit keys 1–5 trigger `onDigit` (used for emotes).
  */
-export function useKeyboard(onDigit: (index: number) => void): InputController {
+export function useKeyboard(onDigit: (index: number) => void, onCallKey?: () => void): InputController {
   const held = useRef<Set<string>>(new Set())
   const onDigitRef = useRef(onDigit)
+  const onCallRef = useRef(onCallKey)
 
   useEffect(() => {
     onDigitRef.current = onDigit
-  }, [onDigit])
+    onCallRef.current = onCallKey
+  }, [onDigit, onCallKey])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -53,6 +55,10 @@ export function useKeyboard(onDigit: (index: number) => void): InputController {
       if (e.code in KEY_VECTORS) {
         e.preventDefault()
         held.current = new Set(held.current).add(e.code)
+        return
+      }
+      if (e.code === 'KeyC' && !e.repeat) {
+        onCallRef.current?.()
         return
       }
       const digit = /^Digit([1-5])$/.exec(e.code)

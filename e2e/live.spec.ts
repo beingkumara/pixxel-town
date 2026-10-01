@@ -42,6 +42,22 @@ test('live CometChat: whisper, room chat and a shared video call', async ({ brow
   await bDm.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(aDm.getByText(DM_MSG)).toBeVisible({ timeout: 15_000 })
 
+  // Whisper call: Ana rings Bo, Bo accepts, both get video; Bo walks away and the call ends.
+  await aDm.getByRole('button', { name: /call/i }).click()
+  const bCall = b.getByRole('region', { name: /whisper call with liveana/i })
+  await expect(bCall.getByText(/LiveAna is calling you/)).toBeVisible({ timeout: 20_000 })
+  await bCall.getByRole('button', { name: 'Accept' }).click()
+  const aCall = a.getByRole('region', { name: /whisper call with livebo/i })
+  for (const [p, region] of [[a, aCall], [b, bCall]] as const) {
+    await expect(region.getByText(/● Whisper call with/)).toBeVisible({ timeout: 45_000 })
+    await expect(p.locator('.dcall__stage video').first()).toBeVisible({ timeout: 30_000 })
+  }
+  console.log('[live] whisper call: connected')
+  await b.evaluate(() => (window as unknown as TP).__pixelTownTeleport(26 * 32 + 16, 16 * 32 + 16))
+  await expect(aCall).toHaveCount(0, { timeout: 15_000 })
+  await expect(bCall).toHaveCount(0, { timeout: 15_000 })
+  console.log('[live] whisper call: ended by walking away')
+
   await a.evaluate(() => (window as unknown as TP).__pixelTownTeleport(4 * 32 + 16, 3 * 32 + 16))
   await b.evaluate(() => (window as unknown as TP).__pixelTownTeleport(5 * 32 + 16, 3 * 32 + 16))
   const aRoom = a.getByRole('region', { name: /room chat: lantern café/i })

@@ -4,7 +4,7 @@ import { MAX_MESSAGE_LENGTH, keyForIncoming, type ChatMessage, type Target } fro
 import { blockSucceeded, toModeration, type ReportReason } from '../lib/moderation'
 import { parsePacket, sanitizeName, type Packet } from '../lib/packet'
 import { WORLD_GUID } from '../lib/world/map'
-import type { Profile, TownTransport, TransportHandlers } from './types'
+import type { CallSignal, DeclineReason, Profile, TownTransport, TransportHandlers } from './types'
 
 /*
  * Built from the CometChat MCP bundles `js-sdk-messaging-basics` and
@@ -94,6 +94,8 @@ function toChatMessage(msg: CometChat.TextMessage, myUid: string): ChatMessage {
 }
 
 const BLOCKED_PAGE = 100
+/** Seconds an unanswered whisper call rings before CometChat cancels it (default is 45). */
+const RING_TIMEOUT_S = 30
 const BLOCKED_MAX_PAGES = 10
 
 export function createCometChatTransport(): TownTransport {
@@ -127,6 +129,23 @@ export function createCometChatTransport(): TownTransport {
         onTypingEnded: (t: CometChat.TypingIndicator) => emitTyping(t, false),
       }),
     )
+    // Ringing for 1:1 whisper calls, per the MCP's /calls/javascript/ringing guide.
+    const signal = (s: CallSignal) => emit((h) => h.onCallSignal?.(s))
+    CometChat.addCallListener(
+      LISTENER_ID,
+      new CometChat.CallListener({
+        onIncomingCallReceived: (call: CometChat.Call) => {
+          if (call.getReceiverType() !== CometChat.RECEIVER_TYPE.USER) return
+          const from = call.getCallInitiator()
+          const peer = { uid: from.getUid(), name: sanitizeName(from.getName() ?? '') || from.getUid() }
+          signal({ type: 'incoming', sessionId: call.getSessionId(), peer })
+        },
+        onOutgoingCallAccepted: (call: CometChat.Call) => signal({ type: 'accepted', sessionId: call.getSessionId() }),
+        onOutgoingCallRejected: (call: CometChat.Call) => signal({ type: 'over', sessionId: call.getSessionId() }),
+        onIncomingCallCancelled: (call: CometChat.Call) => signal({ type: 'over', sessionId: call.getSessionId() }),
+        onCallEndedMessageReceived: (call: CometChat.Call) => signal({ type: 'over', sessionId: call.getSessionId() }),
+      }),
+    )
     CometChat.addUserListener(
       LISTENER_ID,
       new CometChat.UserListener({
@@ -157,6 +176,7 @@ export function createCometChatTransport(): TownTransport {
       if (me) this.broadcast({ t: 'bye', uid: me.uid })
       CometChat.removeMessageListener(LISTENER_ID)
       CometChat.removeUserListener(LISTENER_ID)
+      CometChat.removeCallListener(LISTENER_ID)
       me = null
     },
 
@@ -218,6 +238,29 @@ export function createCometChatTransport(): TownTransport {
         if (users.length < BLOCKED_PAGE) break
       }
       return uids
+    },
+
+    async dialCall(uid) {
+      const call = new CometChat.Call(uid, CometChat.CALL_TYPE.VIDEO, CometChat.RECEIVER_TYPE.USER)
+      const outgoing = await CometChat.initiateCall(call, RING_TIMEOUT_S)
+      return outgoing.getSessionId()
+    },
+
+    async acceptCall(sessionId) {
+      await CometChat.acceptCall(sessionId)
+    },
+
+    async declineCall(sessionId, reason: DeclineReason) {
+      const status = {
+        rejected: CometChat.CALL_STATUS.REJECTED,
+        cancelled: CometChat.CALL_STATUS.CANCELLED,
+        busy: CometChat.CALL_STATUS.BUSY,
+      }[reason]
+      await CometChat.rejectCall(sessionId, status)
+    },
+
+    async endCall(sessionId) {
+      await CometChat.endCall(sessionId)
     },
 
     startTyping(target) {

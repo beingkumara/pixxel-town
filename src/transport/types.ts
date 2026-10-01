@@ -14,6 +14,15 @@ export interface TypingEvent {
   readonly typing: boolean
 }
 
+/** Ringing events for 1:1 whisper calls (CometChat CallListener). */
+export type CallSignal =
+  | { readonly type: 'incoming'; readonly sessionId: string; readonly peer: { readonly uid: string; readonly name: string } }
+  | { readonly type: 'accepted'; readonly sessionId: string }
+  /** Rejected, cancelled, unanswered or ended by the other side. */
+  | { readonly type: 'over'; readonly sessionId: string }
+
+export type DeclineReason = 'rejected' | 'cancelled' | 'busy'
+
 export interface TransportHandlers {
   onPacket(packet: Packet): void
   onMessage(message: ChatMessage): void
@@ -21,6 +30,7 @@ export interface TransportHandlers {
   onPresence(uid: string, online: boolean): void
   /** A moderation verdict (CometChat onMessageModerated), carrying the whole message. */
   onModerated?(message: ChatMessage): void
+  onCallSignal?(signal: CallSignal): void
 }
 
 export type TransportMode = 'cometchat' | 'local'
@@ -50,4 +60,9 @@ export interface TownTransport {
   unblockPlayer(uid: string): Promise<void>
   /** UIDs the current player has blocked. */
   fetchBlocked(): Promise<readonly string[]>
+  /** Rings a player for a 1:1 video call; resolves with the call's session id. */
+  dialCall(uid: string): Promise<string>
+  acceptCall(sessionId: string): Promise<void>
+  declineCall(sessionId: string, reason: DeclineReason): Promise<void>
+  endCall(sessionId: string): Promise<void>
 }

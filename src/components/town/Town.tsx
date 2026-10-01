@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { conversationKey, type ChatMessage, type Target } from '../../lib/conversation'
 import { visibleMessages } from '../../lib/moderation'
 import { zoneById } from '../../lib/world/map'
-import { useConversations, describe } from '../../hooks/useConversations'
+import { ACCENT_DM, useConversations, describe } from '../../hooks/useConversations'
 import { useKeyboard } from '../../hooks/useKeyboard'
+import { useDirectCall } from '../../hooks/useDirectCall'
 import { useSafety, type Safety } from '../../hooks/useSafety'
 import { useWorldSim, type RosterEntry } from '../../hooks/useWorldSim'
 import type { Profile, TownTransport } from '../../transport'
 import { CallPanel } from '../call/CallPanel'
+import { DirectCallCard } from '../call/DirectCallCard'
 import { ChatPanel } from '../chat/ChatPanel'
 import { Hud } from '../hud/Hud'
 import { AvatarPreview } from '../ui/AvatarPreview'
@@ -23,7 +25,11 @@ interface TownProps {
 
 export function Town({ transport, profile, onLeave }: TownProps) {
   const emoteRef = useRef<(index: number) => void>(() => {})
-  const input = useKeyboard((i) => emoteRef.current(i))
+  const callKeyRef = useRef<() => void>(() => {})
+  const input = useKeyboard(
+    (i) => emoteRef.current(i),
+    () => callKeyRef.current(),
+  )
   const safety = useSafety(transport)
   const sim = useWorldSim({ transport, profile, held: input.held, blocked: safety.blockedRef })
   const { zone, partner, roster } = sim
@@ -42,6 +48,29 @@ export function Town({ transport, profile, onLeave }: TownProps) {
   )
 
   const chat = useConversations({ transport, profile, sim, activeKeys, blocked: safety.blockedRef })
+  const inRoomCallRef = useRef(false)
+  const [inRoomCall, setInRoomCall] = useState(false)
+  const onRoomCallActive = useCallback((active: boolean) => {
+    inRoomCallRef.current = active
+    setInRoomCall(active)
+  }, [])
+  const call = useDirectCall({ transport, myUid: profile.uid, inRoomCall: inRoomCallRef, partner, blocked: safety.blockedRef })
+  const canCall = transport.mode === 'cometchat'
+
+  useEffect(() => {
+    callKeyRef.current = () => {
+      if (canCall && partner && call.state.kind === 'idle') void call.dial(partner)
+    }
+  }, [canCall, partner, call])
+
+  // Show who's ringing you on the map, above their head.
+  const { showBubble, hideBubble } = sim
+  const ringingUid = call.state.kind === 'incoming' ? call.state.peer.uid : null
+  useEffect(() => {
+    if (!ringingUid) return
+    showBubble(ringingUid, '📞 calling you…', ACCENT_DM)
+    return () => hideBubble(ringingUid)
+  }, [ringingUid, showBubble, hideBubble])
   const { loadHistory } = chat
 
   useEffect(() => {
@@ -111,6 +140,13 @@ export function Town({ transport, profile, onLeave }: TownProps) {
             · <span className="town__key">
               <kbd>1-5</kbd> emote
             </span>{' '}
+            {canCall && (
+              <>
+                · <span className="town__key">
+                  <kbd>C</kbd> call
+                </span>{' '}
+              </>
+            )}
             · <span className="town__key">walk up to someone to whisper</span>
           </p>
         </div>
@@ -120,6 +156,15 @@ export function Town({ transport, profile, onLeave }: TownProps) {
             <p className="town__toast" role="alert">
               {chat.error}
               <button type="button" onClick={chat.dismissError} aria-label="Dismiss">
+                ×
+              </button>
+            </p>
+          )}
+          <DirectCallCard uid={profile.uid} call={call} />
+          {call.error && (
+            <p className="town__toast" role="alert">
+              {call.error}
+              <button type="button" onClick={call.dismissError} aria-label="Dismiss">
                 ×
               </button>
             </p>
@@ -165,7 +210,14 @@ export function Town({ transport, profile, onLeave }: TownProps) {
               onTypingChange={(t) => (t ? transport.startTyping(roomTarget) : transport.endTyping(roomTarget))}
               disabled={readyRoom !== zone.id}
             >
-              <CallPanel uid={profile.uid} sessionId={zone.guid} roomName={zone.name} available={transport.mode === 'cometchat'} />
+              <CallPanel
+                uid={profile.uid}
+                sessionId={zone.guid}
+                roomName={zone.name}
+                available={transport.mode === 'cometchat'}
+                busyReason={call.state.kind !== 'idle' ? 'Hang up your whisper call to join the room call.' : undefined}
+                onActiveChange={onRoomCallActive}
+              />
             </ChatPanel>
           )}
 
@@ -180,13 +232,25 @@ export function Town({ transport, profile, onLeave }: TownProps) {
               reasons={safety.reasons}
               onReport={safety.canReport ? safety.report : undefined}
               headerAction={
-                <button
-                  type="button"
-                  className="btn btn--sm btn--ghost"
-                  onClick={() => void safety.block(partner.uid, partner.name)}
-                >
-                  Block
-                </button>
+                <span className="chat__actions">
+                  {canCall && call.state.kind === 'idle' && !inRoomCall && (
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      title="Call (C)"
+                      onClick={() => void call.dial(partner)}
+                    >
+                      📞 Call
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    onClick={() => void safety.block(partner.uid, partner.name)}
+                  >
+                    Block
+                  </button>
+                </span>
               }
               typingNames={typingFor(dmTarget)}
               myUid={profile.uid}

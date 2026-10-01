@@ -121,6 +121,8 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
 
   const gen = nextGen++
   let ended = false
+  /** Set once our own leave() has been requested; the SDK events it causes aren't "ended by peer". */
+  let leaving = false
   const finish = () => {
     if (ended) return
     ended = true
@@ -131,7 +133,7 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
     }
   }
   const endedBySdk = () => {
-    if (activeGen !== gen) return
+    if (activeGen !== gen || leaving) return
     finish()
     dispose(node)
     onEnded()
@@ -155,7 +157,7 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
     endActive = () => {
       finish()
       dispose(node)
-      onEnded()
+      if (!leaving) onEnded()
     }
   } catch (err) {
     finish()
@@ -172,26 +174,26 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
 
   return {
     leave() {
-      if (ended) return Promise.resolve()
-      // Only hang up if this handle still owns the SDK's single session.
-      const wasActive = activeGen === gen
-      finish()
+      if (ended || leaving) return Promise.resolve()
+      leaving = true
       // Park synchronously: when React is about to remove the host, the node must already be out.
       park(node)
-      if (!wasActive) {
-        dispose(node)
-        return Promise.resolve()
-      }
+      // The session stays "ours" (activeGen) until the queued leave runs, so a join queued in
+      // between sees it via leaveActive and tears it down first instead of joining on top of it.
       return serial(async () => {
-        const left = waitForLeft(sdk)
-        sdk.leaveSession()
-        await left
+        if (activeGen === gen) {
+          const left = waitForLeft(sdk)
+          sdk.leaveSession()
+          await left
+        }
+        finish()
         dispose(node)
       })
     },
   }
 }
 
-export function joinRoomCall(uid: string, sessionId: string, host: HTMLElement, onEnded: () => void): Promise<CallHandle> {
+/** Joins a Calls SDK session (a room's shared call or a 1:1 whisper call) into `host`. */
+export function joinCallSession(uid: string, sessionId: string, host: HTMLElement, onEnded: () => void): Promise<CallHandle> {
   return serial(() => join(uid, sessionId, host, onEnded))
 }

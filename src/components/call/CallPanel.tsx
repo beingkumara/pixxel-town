@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { joinRoomCall, type CallHandle } from '../../calls/callSession'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { joinCallSession, type CallHandle } from '../../calls/callSession'
 import { describe } from '../../hooks/useConversations'
 import './call.css'
 
@@ -11,17 +11,33 @@ interface CallPanelProps {
   roomName: string
   /** Calls need real CometChat credentials; the local demo transport can't place them. */
   available: boolean
+  /** Set while a whisper call holds the (single) Calls SDK session. */
+  busyReason?: string
+  /** Reports whether this room call is joining/live, so whisper calls can stay out of its way. */
+  onActiveChange?: (active: boolean) => void
 }
 
 /**
  * One video call per room. Everyone standing in the room shares the room's
  * session id. Walking out of the room unmounts this panel, which hangs up.
  */
-export function CallPanel({ uid, sessionId, roomName, available }: CallPanelProps) {
+export function CallPanel({ uid, sessionId, roomName, available, busyReason, onActiveChange }: CallPanelProps) {
   const [state, setState] = useState<CallState>({ status: 'idle' })
   const containerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<CallHandle | null>(null)
   const mounted = useRef(true)
+  const active = state.status === 'joining' || state.status === 'live'
+  const onActiveRef = useRef(onActiveChange)
+
+  useEffect(() => {
+    onActiveRef.current = onActiveChange
+  }, [onActiveChange])
+
+  useEffect(() => {
+    onActiveRef.current?.(active)
+  }, [active])
+
+  useEffect(() => () => onActiveRef.current?.(false), [])
 
   // Layout effect: its cleanup runs before React removes the stage, so the SDK's node is
   // parked offscreen while it still has a size (see callSession.park).
@@ -39,7 +55,7 @@ export function CallPanel({ uid, sessionId, roomName, available }: CallPanelProp
     if (!container) return
     setState({ status: 'joining' })
     try {
-      const handle = await joinRoomCall(uid, sessionId, container, () => {
+      const handle = await joinCallSession(uid, sessionId, container, () => {
         handleRef.current = null
         if (mounted.current) setState({ status: 'idle' })
       })
@@ -76,13 +92,15 @@ export function CallPanel({ uid, sessionId, roomName, available }: CallPanelProp
         ) : (
           <>
             <span className="call__hint">
-              {available ? 'Everyone in this room shares one call.' : 'Video calls need CometChat credentials (.env.local).'}
+              {!available
+                ? 'Video calls need CometChat credentials (.env.local).'
+                : busyReason ?? 'Everyone in this room shares one call.'}
             </span>
             <button
               type="button"
               className="btn btn--sm"
               onClick={join}
-              disabled={!available || state.status === 'joining'}
+              disabled={!available || Boolean(busyReason) || state.status === 'joining'}
             >
               {state.status === 'joining' ? 'Joining…' : '📹 Join call'}
             </button>

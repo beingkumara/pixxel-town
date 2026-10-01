@@ -63,3 +63,62 @@
   width: 100%;
   height: 100%;
 }
+
+/* 1:1 whisper calls: a fuchsia environment, like the whisper panel. */
+.dcall {
+  overflow: hidden;
+  background: var(--env-dm);
+  border: 1px solid rgb(235 69 158 / 0.55);
+  border-radius: var(--radius-panel);
+  animation: chat-in var(--duration-normal) var(--ease-out-expo);
+}
+
+.dcall[hidden] {
+  display: none;
+}
+
+.dcall__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.dcall__status {
+  margin: 0;
+  font-weight: 500;
+}
+
+.dcall--incoming .dcall__status {
+  animation: ring 1.2s ease-in-out infinite;
+}
+
+@keyframes ring {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.dcall__actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.dcall__stage {
+  display: none;
+  height: 240px;
+  background: #000;
+}
+
+.dcall--connecting .dcall__stage,
+.dcall--live .dcall__stage {
+  display: block;
+}
+
+.dcall__hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-fog);
+}

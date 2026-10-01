@@ -135,5 +135,13 @@ export function createLocalTransport(): TownTransport {
     async fetchBlocked() {
       return [...blocked]
     },
+
+    // Calls need the real CometChat backend.
+    async dialCall() {
+      throw new Error('Whisper calls need CometChat credentials (.env.local)')
+    },
+    async acceptCall() {},
+    async declineCall() {},
+    async endCall() {},
   }
 }
