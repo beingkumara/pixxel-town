@@ -5,6 +5,7 @@ import type { Direction } from '../../lib/world/movement'
 import { drawAvatar } from '../world/sprites'
 import { drawWorldLabels } from '../world/worldLabels'
 import { fitCanvas } from '../world/fitCanvas'
+import { drawLights, renderMap } from '../world/tiles'
 import type { Rect } from '../../lib/world/labels'
 
 /** Canvas-space rects of the floating chips that overlap the preview, so in-map text avoids them. */
@@ -18,11 +19,12 @@ function chipRects(canvas: HTMLCanvasElement): readonly Rect[] {
     return { x: (r.left - box.left) * k, y: (r.top - box.top) * k, w: r.width * k, h: r.height * k }
   })
 }
-import { drawLights, renderMap } from '../world/tiles'
 
 const WIDTH = MAP_W * TILE
 const HEIGHT = MAP_H * TILE
 const CYCLE_MS = 7000
+/** The chips drift slowly, so re-measuring them twice a second is plenty (and avoids a layout read every frame). */
+const CHIP_RECT_REFRESH_MS = 500
 
 const at = (tx: number, ty: number) => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
 
@@ -106,7 +108,13 @@ export function WorldPreview() {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     let frame = 0
+    let chips: readonly Rect[] = []
+    let chipsAt = -Infinity
     const paint = (now: number) => {
+      if (now - chipsAt > CHIP_RECT_REFRESH_MS) {
+        chips = chipRects(ctx.canvas)
+        chipsAt = now
+      }
       const t = reduced ? 2000 : now
       const phase = (t % CYCLE_MS) / CYCLE_MS
       fitCanvas(ctx, { x: 0, y: 0, w: WIDTH, h: HEIGHT })
@@ -118,7 +126,7 @@ export function WorldPreview() {
         ctx,
         poses.map(({ c, x, y }) => ({ x, y, name: c.name, accent: c.tag, bubble: c.says?.(phase) })),
         t,
-        chipRects(ctx.canvas),
+        chips,
       )
       if (!reduced) frame = requestAnimationFrame(paint)
     }

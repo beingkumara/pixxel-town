@@ -36,6 +36,13 @@
   white-space: nowrap;
 }
 
+/* The separator belongs to the group after it, so a line can never end on a dangling "·". */
+.town__key + .town__key::before {
+  content: '·';
+  margin-right: var(--space-2);
+  color: var(--color-dim);
+}
+
 /* Arrow keycaps: one glyph each, set in the body face (the mono's arrows are hairlines). */
 .town__arrows {
   display: inline-flex;

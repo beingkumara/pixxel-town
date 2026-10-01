@@ -11,21 +11,25 @@ Built for the [CometChat Zero to Chat](https://www.cometchat.com/hackathon) chal
 | Avatars moving in real time | **Transient messages** to a `pixel-town-world` group (not persisted, ~8/s while walking) |
 | Walk near someone → whisper | **1:1 text messages** + message history |
 | "…" bubble over their head | **Typing indicators** (`startTyping` / `onTypingStarted`) |
+| 📞 Call the person next to you | **Chat SDK ringing** (`initiateCall` / `acceptCall` / `rejectCall` / `endCall` via CallListener); **Calls SDK v5** for 1:1 video; walks out of range hangs up |
 | Room chat (Café / War Room / Garden) | **Public groups**, joined on entry (`joinGroup` / `createGroup`) |
 | 📹 Join call in a room | **Calls SDK v5**: every player in the room shares the room's session id |
 | Players vanish when they close the tab | **Presence** (`onUserOffline`) + a `bye` packet |
+| ⚑ Report a message; 🚫 Block a player | **Moderation**: honour server verdicts (`onMessageModerated`); report to dashboard (`flagMessage`); block hides a player server-side (`blockUsers`) |
 | Emotes 👋❤️😂🎉🔥 | Transient messages |
 
 ## How the MCP was used
 
 The CometChat MCP (`claude mcp add --transport http cometchat https://mcp.cometchat.com/mcp?ref=z2c`, checked in at [`.mcp.json`](.mcp.json)) supplied every CometChat integration detail:
 
-- `list_cometchat_bundles` → picked `js-sdk-messaging-basics`, `presence-and-typing` and `react-uikit-quickstart`
+- `list_cometchat_bundles` → picked `js-sdk-messaging-basics`, `presence-and-typing`, `moderation-setup` and `react-uikit-quickstart`
 - `get_cometchat_implementation_bundle` → init/login order, listener cleanup, typing debounce guidance (the "don't call startTyping every keystroke" pitfall shaped `ChatPanel`)
 - `search_cometchat_docs` + `fetch_cometchat_doc_page` →
   - `/sdk/javascript/transient-messages`: the key idea for streaming avatar positions without persisting them
   - `/calls/javascript/{setup,authentication,join-session,events}`: Calls SDK v5 `generateToken` → `joinSession` flow and the single-active-session rule
+  - `/calls/javascript/ringing`: Chat SDK signalling (`initiateCall`, `CallListener`) for whisper calls; Calls SDK v5 carries the media
   - `/sdk/javascript/{create-group,join-group,user-management,error-codes}`: `ERR_UID_NOT_FOUND`, `ERR_GUID_NOT_FOUND` and `ERR_ALREADY_JOINED` handling in `transport/cometchat.ts`
+  - `/sdk/javascript/{ai-moderation,flag-message,block-users}`: honour server verdicts, report messages, and block players server-side
 
 ## Run it
 
@@ -47,7 +51,7 @@ No credentials? The app falls back to a **local demo mode**: tabs in the same br
 
 ### Controls
 
-`WASD` / arrow keys to walk · `1`–`5` emotes · on touch screens, an on-screen D-pad.
+`WASD` / arrow keys to walk · `1`–`5` emotes · `C` to call someone you're standing next to · on touch screens, an on-screen D-pad.
 
 ## Architecture
 
@@ -77,8 +81,9 @@ src/
 ## Tests
 
 ```bash
-npm test          # 58 unit tests (vitest): map, movement, proximity, packet validation, rate limiting, store, uid
-npm run e2e       # Playwright: two players, whisper + typing + room chat + walking away
+npm test          # 108 unit tests (vitest): map, movement, proximity, packet validation, rate limiting, moderation, calls, store, uid
+npm run e2e       # Playwright: two players, whisper + typing + room chat + block + walking away
+npm run e2e:live  # Playwright against live CometChat app: whisper, room chat, room video, whisper call, block (opt-in)
 ```
 
 ## Production notes
@@ -87,4 +92,4 @@ This is a hackathon demo. Before shipping for real:
 
 - Replace Auth Key login with **server-minted Auth Tokens** (`loginWithAuthToken`) and create users server-side.
 - Add a Content-Security-Policy that allows the CometChat API, WebSocket and Calls origins for your region.
-- Consider CometChat's moderation bundle (`moderation-setup`) for public towns.
+- Enable CometChat's **Moderation add-on** for reporting, flagging and blocking. The free tier's `flagMessage` and `blockUsers` return a "not available" error; a paid plan is required to use moderation features.

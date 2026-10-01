@@ -136,18 +136,16 @@ export function Town({ transport, profile, onLeave }: TownProps) {
                 <kbd>→</kbd>
               </span>{' '}
               walk
-            </span>{' '}
-            · <span className="town__key">
+            </span>
+            <span className="town__key">
               <kbd>1-5</kbd> emote
-            </span>{' '}
+            </span>
             {canCall && (
-              <>
-                · <span className="town__key">
-                  <kbd>C</kbd> call
-                </span>{' '}
-              </>
+              <span className="town__key">
+                <kbd>C</kbd> call
+              </span>
             )}
-            · <span className="town__key">walk up to someone to whisper</span>
+            <span className="town__key">walk up to someone to whisper</span>
           </p>
         </div>
 
