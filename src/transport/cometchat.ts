@@ -1,6 +1,7 @@
 import { CometChat } from '@cometchat/chat-sdk-javascript'
 import { COMETCHAT } from '../config'
 import { MAX_MESSAGE_LENGTH, keyForIncoming, type ChatMessage, type Target } from '../lib/conversation'
+import { blockSucceeded, toModeration, type ReportReason } from '../lib/moderation'
 import { parsePacket, sanitizeName, type Packet } from '../lib/packet'
 import { WORLD_GUID } from '../lib/world/map'
 import type { Profile, TownTransport, TransportHandlers } from './types'
@@ -88,8 +89,12 @@ function toChatMessage(msg: CometChat.TextMessage, myUid: string): ChatMessage {
     // Other clients can bypass our input's maxLength, so cap on receipt too.
     text: msg.getText().slice(0, MAX_MESSAGE_LENGTH),
     sentAt: (msg.getSentAt() || Math.floor(Date.now() / 1000)) * 1000,
+    moderation: toModeration(msg.getModerationStatus?.()),
   }
 }
+
+const BLOCKED_PAGE = 100
+const BLOCKED_MAX_PAGES = 10
 
 export function createCometChatTransport(): TownTransport {
   let me: Profile | null = null
@@ -111,6 +116,12 @@ export function createCometChatTransport(): TownTransport {
           // Reject packets that claim to be from someone other than the real sender.
           if (!packet || packet.uid !== tm.getSender()?.getUid() || packet.uid === myUid) return
           emit((h) => h.onPacket(packet))
+        },
+        onMessageModerated: (m: CometChat.BaseMessage) => {
+          // Pixel Town only sends text, so only text verdicts matter here.
+          if (!(m instanceof CometChat.TextMessage)) return
+          const message = toChatMessage(m, myUid)
+          emit((h) => h.onModerated?.(message))
         },
         onTypingStarted: (t: CometChat.TypingIndicator) => emitTyping(t, true),
         onTypingEnded: (t: CometChat.TypingIndicator) => emitTyping(t, false),
@@ -175,6 +186,38 @@ export function createCometChatTransport(): TownTransport {
       return list
         .filter((m): m is CometChat.TextMessage => m instanceof CometChat.TextMessage)
         .map((m) => toChatMessage(m, self.uid))
+    },
+
+    async getReportReasons() {
+      const reasons = await CometChat.getFlagReasons()
+      return reasons.map((r): ReportReason => ({ id: r.id, label: r.name || r.id }))
+    },
+
+    async reportMessage(messageId, reasonId) {
+      await CometChat.flagMessage(messageId, { reasonId })
+    },
+
+    // blockUsers/unblockUsers report per-UID success instead of rejecting (see blockSucceeded).
+    async blockPlayer(uid) {
+      if (!blockSucceeded(await CometChat.blockUsers([uid]), uid)) throw new Error('CometChat refused the block')
+    },
+
+    async unblockPlayer(uid) {
+      if (!blockSucceeded(await CometChat.unblockUsers([uid]), uid)) throw new Error('CometChat refused the unblock')
+    },
+
+    async fetchBlocked() {
+      const request = new CometChat.BlockedUsersRequestBuilder()
+        .setLimit(BLOCKED_PAGE)
+        .setDirection(CometChat.BlockedUsersRequest.directions.BLOCKED_BY_ME)
+        .build()
+      const uids: string[] = []
+      for (let page = 0; page < BLOCKED_MAX_PAGES; page++) {
+        const users: readonly CometChat.User[] = await request.fetchNext()
+        uids.push(...users.map((u) => u.getUid()))
+        if (users.length < BLOCKED_PAGE) break
+      }
+      return uids
     },
 
     startTyping(target) {

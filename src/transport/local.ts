@@ -1,4 +1,5 @@
 import { keyForIncoming, type ChatMessage, type Target } from '../lib/conversation'
+import { FALLBACK_REPORT_REASONS } from '../lib/moderation'
 import { parsePacket, type Packet } from '../lib/packet'
 import type { Profile, TownTransport, TransportHandlers } from './types'
 
@@ -20,6 +21,7 @@ export function createLocalTransport(): TownTransport {
   let channel: BroadcastChannel | null = null
   const joinedRooms = new Set<string>()
   const history: ChatMessage[] = []
+  let blocked: ReadonlySet<string> = new Set()
   const handlerSets = new Set<TransportHandlers>()
   const emit = (fn: (h: TransportHandlers) => void) => handlerSets.forEach(fn)
 
@@ -33,6 +35,7 @@ export function createLocalTransport(): TownTransport {
     senderName: from.name,
     text,
     sentAt,
+    moderation: 'none',
   })
 
   function onEnvelope(env: Envelope) {
@@ -112,6 +115,25 @@ export function createLocalTransport(): TownTransport {
     subscribe(handlers) {
       handlerSets.add(handlers)
       return () => handlerSets.delete(handlers)
+    },
+
+    // No dashboard offline: reports are accepted but go nowhere, and blocks last for this tab.
+    async getReportReasons() {
+      return FALLBACK_REPORT_REASONS
+    },
+
+    async reportMessage() {},
+
+    async blockPlayer(uid) {
+      blocked = new Set(blocked).add(uid)
+    },
+
+    async unblockPlayer(uid) {
+      blocked = new Set([...blocked].filter((u) => u !== uid))
+    },
+
+    async fetchBlocked() {
+      return [...blocked]
     },
   }
 }

@@ -3,6 +3,9 @@ export interface Target {
   readonly id: string
 }
 
+/** Server-side moderation state (see lib/moderation.ts). 'none' when moderation is off. */
+export type Moderation = 'none' | 'pending' | 'approved' | 'blocked'
+
 export interface ChatMessage {
   readonly id: string
   /** Conversation key, see {@link conversationKey}. */
@@ -12,6 +15,7 @@ export interface ChatMessage {
   readonly text: string
   /** Unix milliseconds. */
   readonly sentAt: number
+  readonly moderation: Moderation
 }
 
 export type MessageMap = Readonly<Record<string, readonly ChatMessage[]>>
@@ -39,10 +43,18 @@ export function appendMessage(state: MessageMap, message: ChatMessage): MessageM
 
 export function mergeMessages(state: MessageMap, key: string, incoming: readonly ChatMessage[]): MessageMap {
   const existing = state[key] ?? []
+  const byId = new Map(incoming.map((m) => [m.id, m]))
+  // A copy we hold as 'pending' gives way to a later verdict (e.g. a history reload after a
+  // missed onMessageModerated); a verdict is never overwritten by a stale pending copy.
+  const refreshed = existing.map((m) => {
+    const update = byId.get(m.id)
+    return update && m.moderation === 'pending' && update.moderation !== 'pending' ? update : m
+  })
+  const changed = refreshed.some((m, i) => m !== existing[i])
   const seen = new Set(existing.map((m) => m.id))
   const fresh = incoming.filter((m) => !seen.has(m.id))
-  if (fresh.length === 0 && key in state) return state
-  const merged = [...existing, ...fresh]
+  if (fresh.length === 0 && !changed && key in state) return state
+  const merged = [...refreshed, ...fresh]
     .sort((a, b) => a.sentAt - b.sentAt)
     .slice(-MAX_MESSAGES_PER_CONVERSATION)
   return { ...state, [key]: merged }

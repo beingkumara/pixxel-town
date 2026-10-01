@@ -18,13 +18,23 @@ const LEAVE_WAIT_MS = 4000
 const NODE_LINGER_MS = 6000
 
 let sdkPromise: Promise<CallsSdk> | null = null
-/** Tail of the join queue. */
+/**
+ * Tail of the call queue. Joins AND leaves run through it one at a time, so a join can never
+ * start while a previous session is still tearing down (its late onSessionLeft would end the
+ * new call).
+ */
 let queue: Promise<unknown> = Promise.resolve()
 /** Generation of the session currently joined (0 = none). */
 let activeGen = 0
 let nextGen = 1
-/** The most recent hang-up. A new join waits for it so a late onSessionLeft can't end the new call. */
-let teardown: Promise<void> = Promise.resolve()
+/** Ends the active session's handle if something else has to take over the SDK. */
+let endActive: (() => void) | null = null
+
+function serial<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task)
+  queue = run.catch(() => undefined)
+  return run
+}
 
 function loadSdk(uid: string): Promise<CallsSdk> {
   if (!sdkPromise) {
@@ -48,7 +58,6 @@ function loadSdk(uid: string): Promise<CallsSdk> {
   })
 }
 
-/** Leave whatever session is active and wait (briefly) for the SDK to confirm. */
 /** Resolves when the SDK reports the session left (or after a short timeout). */
 function waitForLeft(sdk: CallsSdk): Promise<void> {
   return new Promise((resolve) => {
@@ -62,8 +71,10 @@ function waitForLeft(sdk: CallsSdk): Promise<void> {
   })
 }
 
+/** Safety net: if a session is somehow still active, end its handle and leave it. */
 function leaveActive(sdk: CallsSdk): Promise<void> {
   if (activeGen === 0) return Promise.resolve()
+  endActive?.()
   activeGen = 0
   const left = waitForLeft(sdk)
   sdk.leaveSession()
@@ -101,7 +112,6 @@ export interface CallHandle {
 }
 
 async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: () => void): Promise<CallHandle> {
-  await teardown
   const sdk = await loadSdk(uid)
   await leaveActive(sdk)
 
@@ -115,7 +125,10 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
     if (ended) return
     ended = true
     unsubscribers.forEach((off) => off())
-    if (activeGen === gen) activeGen = 0
+    if (activeGen === gen) {
+      activeGen = 0
+      endActive = null
+    }
   }
   const endedBySdk = () => {
     if (activeGen !== gen) return
@@ -125,9 +138,13 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
   }
   const unsubscribers = [sdk.addEventListener('onSessionLeft', endedBySdk), sdk.addEventListener('onSessionTimedOut', endedBySdk)]
 
+  let attempted = false
   try {
     // Every player in the same room uses the same session id, so they land in one call.
     const { token } = await sdk.generateToken(sessionId)
+    // The panel unmounted while we were connecting: don't render into a detached (0×0) host.
+    if (!host.isConnected) throw new Error('Call cancelled: left the room while connecting')
+    attempted = true
     const result = await sdk.joinSession(
       token,
       { sessionType: 'VIDEO', layout: 'TILE', startAudioMuted: false, startVideoPaused: false },
@@ -135,33 +152,46 @@ async function join(uid: string, sessionId: string, host: HTMLElement, onEnded: 
     )
     if (result.error) throw new Error(`Could not join call: ${JSON.stringify(result.error)}`)
     activeGen = gen
+    endActive = () => {
+      finish()
+      dispose(node)
+      onEnded()
+    }
   } catch (err) {
     finish()
+    park(node)
+    if (attempted) {
+      // joinSession may have got partway; make sure the SDK isn't left holding a session.
+      const left = waitForLeft(sdk)
+      sdk.leaveSession()
+      await left
+    }
     dispose(node)
     throw err
   }
 
   return {
-    async leave() {
-      if (ended) return
+    leave() {
+      if (ended) return Promise.resolve()
       // Only hang up if this handle still owns the SDK's single session.
       const wasActive = activeGen === gen
       finish()
+      // Park synchronously: when React is about to remove the host, the node must already be out.
       park(node)
       if (!wasActive) {
         dispose(node)
-        return
+        return Promise.resolve()
       }
-      const left = waitForLeft(sdk)
-      sdk.leaveSession()
-      teardown = left.then(() => dispose(node))
-      await teardown
+      return serial(async () => {
+        const left = waitForLeft(sdk)
+        sdk.leaveSession()
+        await left
+        dispose(node)
+      })
     },
   }
 }
 
 export function joinRoomCall(uid: string, sessionId: string, host: HTMLElement, onEnded: () => void): Promise<CallHandle> {
-  const attempt = queue.then(() => join(uid, sessionId, host, onEnded))
-  queue = attempt.catch(() => undefined)
-  return attempt
+  return serial(() => join(uid, sessionId, host, onEnded))
 }

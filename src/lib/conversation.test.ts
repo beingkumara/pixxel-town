@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { appendMessage, conversationKey, keyForIncoming, type ChatMessage } from './conversation'
+import { appendMessage, conversationKey, keyForIncoming, mergeMessages, type ChatMessage } from './conversation'
 
 const msg = (id: string, key = 'user:bob'): ChatMessage => ({
   id,
@@ -8,6 +8,7 @@ const msg = (id: string, key = 'user:bob'): ChatMessage => ({
   senderName: 'Bob',
   text: `hi ${id}`,
   sentAt: Number(id),
+  moderation: 'none',
 })
 
 describe('conversationKey', () => {
@@ -51,5 +52,18 @@ describe('appendMessage', () => {
     expect(list).toHaveLength(100)
     expect(list[list.length - 1].id).toBe('200')
     expect(list[0].sentAt).toBeLessThan(list[1].sentAt)
+  })
+})
+
+describe('mergeMessages with moderation', () => {
+  test('a reload refreshes a message stuck in pending', () => {
+    const state = appendMessage({}, { ...msg('1'), moderation: 'pending' })
+    const next = mergeMessages(state, 'user:bob', [{ ...msg('1'), moderation: 'approved' }])
+    expect(next['user:bob'][0].moderation).toBe('approved')
+  })
+
+  test('a stale pending copy never overwrites a verdict', () => {
+    const state = appendMessage({}, { ...msg('1'), moderation: 'blocked' })
+    expect(appendMessage(state, { ...msg('1'), moderation: 'pending' })).toBe(state)
   })
 })

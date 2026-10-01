@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import {
   MAX_MESSAGE_LENGTH,
   appendMessage,
@@ -8,6 +8,7 @@ import {
   type MessageMap,
   type Target,
 } from '../lib/conversation'
+import { applyVerdict } from '../lib/moderation'
 import { THEME } from '../lib/theme'
 import type { Profile, TownTransport } from '../transport'
 import type { WorldSim } from './useWorldSim'
@@ -27,13 +28,19 @@ export type TypingMap = Readonly<Record<string, readonly string[]>>
 interface Options {
   transport: TownTransport
   profile: Profile
-  sim: Pick<WorldSim, 'showBubble' | 'setTyping'>
+  sim: Pick<WorldSim, 'showBubble' | 'hideBubble' | 'setTyping'>
   /** Keys the player is currently "in" — only these produce map bubbles. */
   activeKeys: readonly string[]
+  /** Players this user blocked (see useSafety). */
+  blocked: RefObject<ReadonlySet<string>>
 }
+
+/** Others' messages only surface once moderation lets them through. */
+const isCleared = (m: ChatMessage): boolean => m.moderation === 'none' || m.moderation === 'approved'
 
 export interface UnreadWhisper {
   readonly key: string
+  readonly uid: string
   readonly name: string
   readonly count: number
 }
@@ -50,7 +57,7 @@ const withTyping = (state: TypingMap, key: string, uid: string, typing: boolean)
   return { ...state, [key]: typing ? [...current, uid] : current.filter((u) => u !== uid) }
 }
 
-export function useConversations({ transport, profile, sim, activeKeys }: Options) {
+export function useConversations({ transport, profile, sim, activeKeys, blocked }: Options) {
   const [messages, setMessages] = useState<MessageMap>({})
   const [typing, setTypingMap] = useState<TypingMap>({})
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +65,10 @@ export function useConversations({ transport, profile, sim, activeKeys }: Option
   const [seenActive, setSeenActive] = useState(activeKeys)
   const loaded = useRef<Set<string>>(new Set())
   const activeRef = useRef(activeKeys)
+  /** Verdicts seen so far, so a reply from sendText can't resurrect a stale 'pending'. */
+  const verdicts = useRef<ReadonlyMap<string, ChatMessage['moderation']>>(new Map())
+  /** Shows someone else's cleared message: a map bubble if you're in that chat, else an unread notice. */
+  const surfaceRef = useRef<(m: ChatMessage) => void>(() => {})
 
   // Opening a conversation marks it read (state adjusted during render, per React docs).
   if (seenActive !== activeKeys) {
@@ -71,7 +82,23 @@ export function useConversations({ transport, profile, sim, activeKeys }: Option
     activeRef.current = activeKeys
   }, [activeKeys])
 
-  const { showBubble, setTyping } = sim
+
+  const { showBubble, hideBubble, setTyping } = sim
+
+  useEffect(() => {
+    surfaceRef.current = (m: ChatMessage) => {
+      if (blocked.current.has(m.senderUid) || !isCleared(m)) return
+      if (activeRef.current.includes(m.key)) {
+        showBubble(m.senderUid, m.text, accentForKey(m.key))
+      } else if (m.key.startsWith('user:')) {
+        // Proximity is decided per client, so a whisper can arrive while its panel is closed.
+        setUnread((prev) => ({
+          ...prev,
+          [m.key]: { key: m.key, uid: m.senderUid, name: m.senderName, count: (prev[m.key]?.count ?? 0) + 1 },
+        }))
+      }
+    }
+  }, [blocked, showBubble])
 
   useEffect(() => {
     return transport.subscribe({
@@ -85,22 +112,28 @@ export function useConversations({ transport, profile, sim, activeKeys }: Option
       onMessage: (message: ChatMessage) => {
         setMessages((prev) => appendMessage(prev, message))
         setTypingMap((prev) => withTyping(prev, message.key, message.senderUid, false))
-        if (activeRef.current.includes(message.key)) {
-          showBubble(message.senderUid, message.text, accentForKey(message.key))
-        } else if (message.key.startsWith('user:') && message.senderUid !== profile.uid) {
-          // Proximity is decided per client, so a whisper can arrive while its panel is closed.
-          setUnread((prev) => ({
-            ...prev,
-            [message.key]: { key: message.key, name: message.senderName, count: (prev[message.key]?.count ?? 0) + 1 },
-          }))
+        if (message.senderUid !== profile.uid) surfaceRef.current(message)
+      },
+      onModerated: (message: ChatMessage) => {
+        verdicts.current = new Map(verdicts.current).set(message.id, message.moderation)
+        setMessages((prev) => applyVerdict(prev, message))
+        if (message.senderUid === profile.uid) {
+          if (message.moderation === 'blocked') {
+            hideBubble(profile.uid)
+            setError('Your message was blocked by moderation.')
+          }
+          return
         }
+        // Someone else's message just cleared moderation: surface it now.
+        if (message.moderation === 'approved') surfaceRef.current(message)
       },
       onTyping: ({ key, uid, typing: isTyping }) => {
+        if (blocked.current.has(uid)) return
         setTypingMap((prev) => withTyping(prev, key, uid, isTyping))
         if (activeRef.current.includes(key)) setTyping(uid, isTyping ? accentForKey(key) : null)
       },
     })
-  }, [transport, profile.uid, showBubble, setTyping])
+  }, [transport, profile.uid, blocked, showBubble, hideBubble, setTyping])
 
   const loadHistory = useCallback(
     async (target: Target) => {
@@ -125,8 +158,13 @@ export function useConversations({ transport, profile, sim, activeKeys }: Option
       const text = raw.trim().slice(0, MAX_MESSAGE_LENGTH)
       if (!text) return false
       try {
-        const message = await transport.sendText(target, text)
+        const sent = await transport.sendText(target, text)
+        const message = { ...sent, moderation: verdicts.current.get(sent.id) ?? sent.moderation }
         setMessages((prev) => appendMessage(prev, message))
+        if (message.moderation === 'blocked') {
+          setError('Your message was blocked by moderation.')
+          return true
+        }
         showBubble(profile.uid, text, accentForKey(message.key))
         setError(null)
         return true

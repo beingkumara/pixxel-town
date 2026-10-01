@@ -101,6 +101,7 @@
 }
 
 .chat__msg {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-self: flex-start;
@@ -176,4 +177,61 @@
 
 .chat__composer input:disabled {
   opacity: 0.6;
+}
+
+.chat__msg--pending {
+  opacity: 0.6;
+}
+
+.chat__msg--blocked {
+  background: rgb(222 39 97 / 0.16);
+  border: 1px dashed rgb(222 39 97 / 0.6);
+}
+
+.chat__msg--blocked .chat__text {
+  font-style: italic;
+  color: var(--color-fog);
+}
+
+/* Report flag: quiet until you hover or focus the message. */
+.chat__report {
+  position: absolute;
+  top: 4px;
+  right: -28px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-chrome);
+  color: var(--color-fog);
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.chat__msg:hover .chat__report,
+.chat__report:focus-visible,
+.chat__report[aria-expanded='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .chat__report {
+    opacity: 1;
+  }
+}
+
+.chat__reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.chat__action {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
 }

@@ -83,6 +83,11 @@
   font-size: var(--text-sm);
 }
 
+.town__toast--info {
+  background: rgb(88 101 242 / 0.14);
+  border-color: rgb(88 101 242 / 0.55);
+}
+
 .town__toast button {
   background: none;
   border: 0;
@@ -232,4 +237,12 @@
   .town__side {
     position: static;
   }
+}
+
+.wander__subtitle--blocked {
+  margin-top: var(--space-5);
+}
+
+.wander__name--blocked::before {
+  background: var(--color-dim);
 }

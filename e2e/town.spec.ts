@@ -72,3 +72,46 @@ test('proximity DM, typing indicator, rooms and walking away', async ({ context 
   await expect(ana.getByRole('heading', { name: 'Go for a wander' })).toBeVisible()
   await expect(ana.getByText('Bo', { exact: true })).toBeVisible()
 })
+
+test('report a message, block a player, then unblock them', async ({ context }) => {
+  const ana = await context.newPage()
+  const bo = await context.newPage()
+  await enterTown(ana, 'Ana', 'Moth')
+  await enterTown(bo, 'Bo', 'Fox')
+
+  const anaDm = ana.getByRole('region', { name: /whisper · proximity dm: bo/i })
+  const boDm = bo.getByRole('region', { name: /whisper · proximity dm: ana/i })
+  await expect(anaDm).toBeVisible()
+  await boDm.getByPlaceholder('Whisper to Ana').fill('buy cheap gold at spam.example')
+  await boDm.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(anaDm.getByText('buy cheap gold at spam.example')).toBeVisible()
+
+  // Report: pick a reason from the menu; the message is marked as reported.
+  await anaDm.getByRole('button', { name: 'Report message from Bo' }).click()
+  await anaDm.getByRole('group', { name: /why are you reporting/i }).getByRole('button', { name: 'Spam or misleading' }).click()
+  await expect(anaDm.getByText(/· reported/)).toBeVisible()
+  await expect(ana.getByRole('status')).toContainText('sent to the moderators')
+
+  // Block: the whisper closes, Bo vanishes from the town and his room messages stay hidden.
+  await anaDm.getByRole('button', { name: 'Block' }).click()
+  await expect(anaDm).toHaveCount(0)
+  await expect(ana.getByRole('status')).toContainText('Bo is blocked')
+  await expect(ana.getByRole('heading', { name: /go for a wander/i })).toBeVisible()
+  await expect(ana.getByText('Blocked · 1')).toBeVisible()
+  await expect(ana.getByText('Townsfolk online · 0')).toBeVisible()
+
+  await teleport(ana, CAFE)
+  await teleport(bo, { x: CAFE.x + TILE, y: CAFE.y })
+  const boRoom = bo.getByRole('region', { name: /room chat: lantern café/i })
+  await boRoom.getByPlaceholder('Message Lantern Café').fill('can you hear me?')
+  await boRoom.getByRole('button', { name: 'Send', exact: true }).click()
+  const anaRoom = ana.getByRole('region', { name: /room chat: lantern café/i })
+  await expect(anaRoom).toBeVisible()
+  await expect(boRoom.getByText('can you hear me?')).toBeVisible()
+  await expect(anaRoom.getByText('can you hear me?')).toHaveCount(0)
+
+  // Unblock from the wander panel.
+  await teleport(ana, FAR_CORNER)
+  await ana.getByRole('button', { name: 'Unblock' }).click()
+  await expect(ana.getByText('Blocked · 1')).toHaveCount(0)
+})

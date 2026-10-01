@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { ChatMessage } from '../../lib/conversation'
+import type { ReportReason } from '../../lib/moderation'
 import { MAX_MESSAGE_LENGTH } from '../../hooks/useConversations'
+import { MessageItem } from './MessageItem'
 import './chat.css'
 
 const TYPING_IDLE_MS = 2000
@@ -20,10 +22,14 @@ interface ChatPanelProps {
   onTypingChange: (typing: boolean) => void
   /** While true (e.g. still joining the room's group) the composer is disabled. */
   disabled?: boolean
+  /** Flag reasons for the report menu on other people's messages. */
+  reasons: readonly ReportReason[]
+  /** Absent when reporting isn't available for this app. */
+  onReport?: (messageId: string, reasonId: string) => Promise<boolean>
+  /** Extra control in the header (e.g. Block on a whisper). */
+  headerAction?: ReactNode
   children?: ReactNode
 }
-
-const timeOf = (ms: number): string => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
 export function ChatPanel(props: ChatPanelProps) {
   const { variant, messages, typingNames, myUid, onSend, onTypingChange } = props
@@ -85,6 +91,7 @@ export function ChatPanel(props: ChatPanelProps) {
         <p className="mono chat__eyebrow">{props.eyebrow}</p>
         <h2 className="display chat__title">{props.title}</h2>
         {props.subtitle && <p className="chat__subtitle">{props.subtitle}</p>}
+        {props.headerAction && <div className="chat__action">{props.headerAction}</div>}
       </header>
 
       {props.children}
@@ -94,12 +101,13 @@ export function ChatPanel(props: ChatPanelProps) {
         {messages.map((m) => {
           const mine = m.senderUid === myUid
           return (
-            <li key={m.id} className={`chat__msg${mine ? ' chat__msg--mine' : ''}`}>
-              <span className="chat__meta">
-                {mine ? 'you' : m.senderName} · {timeOf(m.sentAt)}
-              </span>
-              <span className="chat__text">{m.text}</span>
-            </li>
+            <MessageItem
+              key={m.id}
+              message={m}
+              mine={mine}
+              reasons={props.reasons}
+              onReport={mine ? undefined : props.onReport}
+            />
           )
         })}
       </ol>

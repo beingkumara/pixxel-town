@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { conversationKey, type Target } from '../../lib/conversation'
+import { conversationKey, type ChatMessage, type Target } from '../../lib/conversation'
+import { visibleMessages } from '../../lib/moderation'
 import { zoneById } from '../../lib/world/map'
 import { useConversations, describe } from '../../hooks/useConversations'
 import { useKeyboard } from '../../hooks/useKeyboard'
+import { useSafety, type Safety } from '../../hooks/useSafety'
 import { useWorldSim, type RosterEntry } from '../../hooks/useWorldSim'
 import type { Profile, TownTransport } from '../../transport'
 import { CallPanel } from '../call/CallPanel'
@@ -22,7 +24,8 @@ interface TownProps {
 export function Town({ transport, profile, onLeave }: TownProps) {
   const emoteRef = useRef<(index: number) => void>(() => {})
   const input = useKeyboard((i) => emoteRef.current(i))
-  const sim = useWorldSim({ transport, profile, held: input.held })
+  const safety = useSafety(transport)
+  const sim = useWorldSim({ transport, profile, held: input.held, blocked: safety.blockedRef })
   const { zone, partner, roster } = sim
   const [roomError, setRoomError] = useState<{ zoneId: string; message: string } | null>(null)
   const [readyRoom, setReadyRoom] = useState<string | null>(null)
@@ -38,7 +41,7 @@ export function Town({ transport, profile, onLeave }: TownProps) {
     [roomTarget, dmTarget],
   )
 
-  const chat = useConversations({ transport, profile, sim, activeKeys })
+  const chat = useConversations({ transport, profile, sim, activeKeys, blocked: safety.blockedRef })
   const { loadHistory } = chat
 
   useEffect(() => {
@@ -69,9 +72,15 @@ export function Town({ transport, profile, onLeave }: TownProps) {
   }, [roster])
 
   const typingFor = (target: Target | null) =>
-    target ? (chat.typing[conversationKey(target)] ?? []).filter((u) => u !== profile.uid).map(nameOf) : []
+    target
+      ? (chat.typing[conversationKey(target)] ?? []).filter((u) => u !== profile.uid && !safety.blocked.has(u)).map(nameOf)
+      : []
 
   const roomMates = zone ? roster.filter((r) => r.zone === zone.id) : []
+
+  const shown = (target: Target): readonly ChatMessage[] =>
+    visibleMessages(chat.messages[conversationKey(target)] ?? [], profile.uid, safety.blocked)
+  const unread = chat.unread.filter((u) => !safety.blocked.has(u.uid))
 
   return (
     <div className="town">
@@ -115,15 +124,23 @@ export function Town({ transport, profile, onLeave }: TownProps) {
               </button>
             </p>
           )}
+          {safety.notice && (
+            <p className="town__toast town__toast--info" role="status">
+              {safety.notice}
+              <button type="button" onClick={safety.dismissNotice} aria-label="Dismiss">
+                ×
+              </button>
+            </p>
+          )}
           {roomError && roomError.zoneId === zone?.id && (
             <p className="town__toast" role="alert">
               {roomError.message}
             </p>
           )}
 
-          {chat.unread.length > 0 && (
+          {unread.length > 0 && (
             <ul className="town__unread" aria-live="polite">
-              {chat.unread.map((u) => (
+              {unread.map((u) => (
                 <li key={u.key}>
                   💌 <strong>{u.name}</strong> whispered to you{u.count > 1 ? ` (${u.count})` : ''}. Walk over to reply.
                 </li>
@@ -138,7 +155,9 @@ export function Town({ transport, profile, onLeave }: TownProps) {
               eyebrow="Room chat"
               title={zone.name}
               subtitle={`${zone.blurb} · ${roomMates.length + 1} here`}
-              messages={chat.messages[conversationKey(roomTarget)] ?? []}
+              messages={shown(roomTarget)}
+              reasons={safety.reasons}
+              onReport={safety.canReport ? safety.report : undefined}
               typingNames={typingFor(roomTarget)}
               myUid={profile.uid}
               placeholder={`Message ${zone.name}`}
@@ -157,7 +176,18 @@ export function Town({ transport, profile, onLeave }: TownProps) {
               eyebrow="Whisper · proximity DM"
               title={partner.name}
               subtitle="Only the two of you see this. Walk away to close it."
-              messages={chat.messages[conversationKey(dmTarget)] ?? []}
+              messages={shown(dmTarget)}
+              reasons={safety.reasons}
+              onReport={safety.canReport ? safety.report : undefined}
+              headerAction={
+                <button
+                  type="button"
+                  className="btn btn--sm btn--ghost"
+                  onClick={() => void safety.block(partner.uid, partner.name)}
+                >
+                  Block
+                </button>
+              }
               typingNames={typingFor(dmTarget)}
               myUid={profile.uid}
               placeholder={`Whisper to ${partner.name}`}
@@ -166,14 +196,14 @@ export function Town({ transport, profile, onLeave }: TownProps) {
             />
           )}
 
-          {!zone && !partner && <Wander roster={roster} />}
+          {!zone && !partner && <Wander roster={roster} safety={safety} />}
         </aside>
       </main>
     </div>
   )
 }
 
-function Wander({ roster }: { roster: readonly RosterEntry[] }) {
+function Wander({ roster, safety }: { roster: readonly RosterEntry[]; safety: Safety }) {
   return (
     <section className="wander" aria-labelledby="wander-title">
       <div className="wander__hero">
@@ -209,6 +239,21 @@ function Wander({ roster }: { roster: readonly RosterEntry[] }) {
               </li>
             ))}
           </ul>
+        )}
+        {safety.blocked.size > 0 && (
+          <>
+            <h3 className="mono wander__subtitle wander__subtitle--blocked">Blocked · {safety.blocked.size}</h3>
+            <ul className="wander__roster">
+              {[...safety.blocked].map((uid) => (
+                <li key={uid}>
+                  <span className="wander__name wander__name--blocked">{safety.nameOf(uid)}</span>
+                  <button type="button" className="btn btn--sm btn--ghost" onClick={() => void safety.unblock(uid)}>
+                    Unblock
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </section>

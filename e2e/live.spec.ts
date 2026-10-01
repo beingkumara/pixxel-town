@@ -72,4 +72,26 @@ test('live CometChat: whisper, room chat and a shared video call', async ({ brow
   await a.evaluate(() => (window as unknown as TP).__pixelTownTeleport(27 * 32 + 16, 16 * 32 + 16))
   await expect(aRoom).toHaveCount(0, { timeout: 10_000 })
   await expect(a.locator('.call__stage video')).toHaveCount(0)
+
+  // Safety tools against the real backend. On a plan without moderation, CometChat rejects
+  // flag reasons and the Report buttons are hidden; with moderation, a report must go through.
+  // Blocking must work on every plan.
+  await b.evaluate(() => (window as unknown as TP).__pixelTownTeleport(26 * 32 + 16, 16 * 32 + 16))
+  await expect(aDm).toBeVisible({ timeout: 20_000 })
+  const reportButton = aDm.getByRole('button', { name: 'Report message from LiveBo' }).first()
+  if (await reportButton.isVisible()) {
+    await reportButton.click()
+    await aDm.getByRole('group', { name: /why are you reporting/i }).getByRole('button').first().click()
+    await expect(a.getByRole('status')).toContainText(/sent to the moderators|Reporting isn't available/, { timeout: 15_000 })
+    console.log(`[live] report: ${await a.getByRole('status').textContent()}`)
+    await a.getByRole('status').getByRole('button', { name: 'Dismiss' }).click()
+  } else {
+    console.log('[live] report: hidden (moderation not on this plan)')
+  }
+
+  await aDm.getByRole('button', { name: 'Block' }).click()
+  await expect(a.getByRole('status')).toContainText('LiveBo is blocked', { timeout: 15_000 })
+  await expect(aDm).toHaveCount(0, { timeout: 10_000 })
+  await expect(a.getByText('Blocked · 1')).toBeVisible({ timeout: 10_000 })
+  console.log('[live] block: ok')
 })

@@ -1,4 +1,5 @@
 import type { ChatMessage, Target } from '../lib/conversation'
+import type { ReportReason } from '../lib/moderation'
 import type { Packet } from '../lib/packet'
 
 export interface Profile {
@@ -18,6 +19,8 @@ export interface TransportHandlers {
   onMessage(message: ChatMessage): void
   onTyping(event: TypingEvent): void
   onPresence(uid: string, online: boolean): void
+  /** A moderation verdict (CometChat onMessageModerated), carrying the whole message. */
+  onModerated?(message: ChatMessage): void
 }
 
 export type TransportMode = 'cometchat' | 'local'
@@ -39,4 +42,12 @@ export interface TownTransport {
   startTyping(target: Target): void
   endTyping(target: Target): void
   subscribe(handlers: TransportHandlers): () => void
+  /** Flag reasons configured in the CometChat dashboard (may be empty). */
+  getReportReasons(): Promise<readonly ReportReason[]>
+  /** Sends a message to the dashboard's flagged-messages queue. */
+  reportMessage(messageId: string, reasonId: string): Promise<void>
+  blockPlayer(uid: string): Promise<void>
+  unblockPlayer(uid: string): Promise<void>
+  /** UIDs the current player has blocked. */
+  fetchBlocked(): Promise<readonly string[]>
 }

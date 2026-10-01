@@ -5,6 +5,7 @@ import { directionFor, step, type Direction } from '../lib/world/movement'
 import { advancePlayers, prunePlayers, removePlayer, touchPlayers, upsertPlayer, type PlayerMap } from '../lib/world/players'
 import { findNearest, keepPartner } from '../lib/world/proximity'
 import type { Profile, TownTransport } from '../transport'
+import { withoutBlocked } from '../lib/moderation'
 import { createRateLimiter } from '../lib/rateLimit'
 import { readInput } from './useKeyboard'
 
@@ -64,6 +65,8 @@ interface Options {
   transport: TownTransport
   profile: Profile
   held: RefObject<Set<string>>
+  /** Players this user blocked: never rendered, never whisper partners. */
+  blocked: RefObject<ReadonlySet<string>>
 }
 
 const omit = <T,>(rec: Readonly<Record<string, T>>, key: string): Readonly<Record<string, T>> => {
@@ -83,7 +86,7 @@ const initialState = (): SimState => {
   }
 }
 
-export function useWorldSim({ transport, profile, held }: Options) {
+export function useWorldSim({ transport, profile, held, blocked }: Options) {
   const simRef = useRef<SimState>(initialState())
   const lastBroadcast = useRef({ at: 0, x: NaN, y: NaN })
   const partnerRef = useRef<string | null>(null)
@@ -120,7 +123,7 @@ export function useWorldSim({ transport, profile, held }: Options) {
     const allow = createRateLimiter(PACKET_BURST, PACKETS_PER_SECOND)
     const onPacket = (packet: Packet) => {
       const now = performance.now()
-      if (!allow(packet.uid, now)) return
+      if (!allow(packet.uid, now) || blocked.current.has(packet.uid)) return
       switch (packet.t) {
         case 'pos':
           update((s) => ({ ...s, players: upsertPlayer(s.players, packet, now) }))
@@ -147,7 +150,7 @@ export function useWorldSim({ transport, profile, held }: Options) {
     transport.broadcast({ t: 'hello', uid: profile.uid })
     broadcastPosition(performance.now())
     return unsubscribe
-  }, [transport, profile, broadcastPosition])
+  }, [transport, profile, blocked, broadcastPosition])
 
   // Heartbeat on a timer, not rAF: browsers pause rAF in hidden tabs, which would make us vanish
   // for everyone else. On becoming visible again, re-announce and forgive stale lastSeen values.
@@ -199,11 +202,12 @@ export function useWorldSim({ transport, profile, held }: Options) {
       update((s) => {
         const pos = step(s.me, input, dtMs)
         const alive = dtMs > STALL_MS ? touchPlayers(s.players, now) : prunePlayers(s.players, now, PLAYER_TTL_MS)
+        const hidden = blocked.current
         return {
           me: { x: pos.x, y: pos.y, dir: directionFor(input, s.me.dir), walking },
-          players: advancePlayers(alive, INTERPOLATION),
-          bubbles: Object.fromEntries(Object.entries(s.bubbles).filter(([, b]) => b.until > now)),
-          typing: Object.fromEntries(Object.entries(s.typing).filter(([, b]) => b.until > now)),
+          players: advancePlayers(withoutBlocked(alive, hidden), INTERPOLATION),
+          bubbles: Object.fromEntries(Object.entries(s.bubbles).filter(([uid, b]) => b.until > now && !hidden.has(uid))),
+          typing: Object.fromEntries(Object.entries(s.typing).filter(([uid, b]) => b.until > now && !hidden.has(uid))),
           emotes: s.emotes.filter((e) => now - e.start < EMOTE_MS),
         }
       })
@@ -236,7 +240,7 @@ export function useWorldSim({ transport, profile, held }: Options) {
       const interval = moved ? BROADCAST_MOVING_MS : BROADCAST_IDLE_MS
       if (now - last.at >= interval) broadcastPosition(now)
     },
-    [held, broadcastPosition],
+    [held, blocked, broadcastPosition],
   )
 
   const emote = useCallback(
@@ -254,6 +258,10 @@ export function useWorldSim({ transport, profile, held }: Options) {
     update((s) => ({ ...s, bubbles: { ...s.bubbles, [uid]: bubble }, typing: omit(s.typing, uid) }))
   }, [])
 
+  const hideBubble = useCallback((uid: string) => {
+    update((s) => ({ ...s, bubbles: omit(s.bubbles, uid) }))
+  }, [])
+
   const setTyping = useCallback((uid: string, accent: string | null) => {
     update((s) => ({
       ...s,
@@ -261,7 +269,7 @@ export function useWorldSim({ transport, profile, held }: Options) {
     }))
   }, [])
 
-  return { simRef, tick, zone, partner, roster, emote, showBubble, setTyping }
+  return { simRef, tick, zone, partner, roster, emote, showBubble, hideBubble, setTyping }
 }
 
 export type WorldSim = ReturnType<typeof useWorldSim>
