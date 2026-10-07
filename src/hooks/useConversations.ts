@@ -4,6 +4,7 @@ import {
   appendMessage,
   conversationKey,
   mergeMessages,
+  recentOnly,
   type ChatMessage,
   type MessageMap,
   type Target,
@@ -14,6 +15,11 @@ import type { Profile, TownTransport } from '../transport'
 import type { WorldSim } from './useWorldSim'
 
 const HISTORY_LIMIT = 30
+/**
+ * Rooms are permanent CometChat groups, but Pixel Town treats them like real rooms: walking in
+ * shows the conversation happening now, not every message ever sent there.
+ */
+const ROOM_HISTORY_MS = 15 * 60_000
 
 export { MAX_MESSAGE_LENGTH }
 
@@ -141,7 +147,8 @@ export function useConversations({ transport, profile, sim, activeKeys, blocked 
       if (loaded.current.has(key)) return
       loaded.current = new Set(loaded.current).add(key)
       try {
-        const history = await transport.fetchHistory(target, HISTORY_LIMIT)
+        const fetched = await transport.fetchHistory(target, HISTORY_LIMIT)
+        const history = target.kind === 'group' ? recentOnly(fetched, Date.now(), ROOM_HISTORY_MS) : fetched
         setMessages((prev) => mergeMessages(prev, key, history))
       } catch (err) {
         const next = new Set(loaded.current)

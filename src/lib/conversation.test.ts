@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { appendMessage, conversationKey, keyForIncoming, mergeMessages, type ChatMessage } from './conversation'
+import { appendMessage, conversationKey, keyForIncoming, mergeMessages, recentOnly, type ChatMessage } from './conversation'
 
 const msg = (id: string, key = 'user:bob'): ChatMessage => ({
   id,
@@ -65,5 +65,13 @@ describe('mergeMessages with moderation', () => {
   test('a stale pending copy never overwrites a verdict', () => {
     const state = appendMessage({}, { ...msg('1'), moderation: 'blocked' })
     expect(appendMessage(state, { ...msg('1'), moderation: 'pending' })).toBe(state)
+  })
+})
+
+describe('recentOnly', () => {
+  test('keeps only messages inside the window', () => {
+    const now = 1_000_000
+    const list = [{ ...msg('1'), sentAt: now - 20 * 60_000 }, { ...msg('2'), sentAt: now - 5 * 60_000 }, { ...msg('3'), sentAt: now }]
+    expect(recentOnly(list, now, 15 * 60_000).map((m) => m.id)).toEqual(['2', '3'])
   })
 })

@@ -59,3 +59,8 @@ export function mergeMessages(state: MessageMap, key: string, incoming: readonly
     .slice(-MAX_MESSAGES_PER_CONVERSATION)
   return { ...state, [key]: merged }
 }
+
+/** Messages sent within the last `windowMs` (rooms only remember the current conversation). */
+export function recentOnly(list: readonly ChatMessage[], now: number, windowMs: number): readonly ChatMessage[] {
+  return list.filter((m) => now - m.sentAt <= windowMs)
+}
