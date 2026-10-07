@@ -55,7 +55,7 @@ Two things the MCP docs didn't settle were checked against the live SDK:
 You need Node 18+ and a free CometChat account (no card, 100 monthly active users included).
 
 ```bash
-git clone <this repo> && cd pixel-town
+git clone https://github.com/beingkumara/pixxel-town.git && cd pixxel-town
 npm install
 
 # CometChat credentials: let the CometChat CLI create an app and fetch them…
